@@ -37,10 +37,11 @@ class _EmiDetailsPageState extends ConsumerState<EmiDetailsPage> {
     final emi = ref.watch(emisNotifierProvider
         .select((emis) => emis.firstWhere((emi) => emi.id == widget.emiId)));
 
-    final List<Transaction> transactions = [...ref
-        .watch(transactionsNotifierProvider)
-        .where((transaction) => transaction.loanLendId == widget.emiId)]
-      ..sort((a, b) => a.datetime.compareTo(b.datetime));
+    final List<Transaction> transactions = [
+      ...ref
+          .watch(transactionsNotifierProvider)
+          .where((transaction) => transaction.loanLendId == widget.emiId)
+    ]..sort((a, b) => a.datetime.compareTo(b.datetime));
 
     final l10n = AppLocalizations.of(context)!;
     final emiTypeColor = emi.emiType == 'lend'
@@ -246,12 +247,23 @@ class _EmiDetailsPageState extends ConsumerState<EmiDetailsPage> {
                   transaction.datetime.toLocal().toString().substring(0, 16),
                   style: const TextStyle(color: Colors.grey),
                 ),
-                trailing: Text(
-                  "${isCredit ? '+' : '-'}₹${GlobalFormatter.formatNumber(ref, transaction.amount)}",
-                  style: TextStyle(
-                      fontSize: 16.0,
-                      color: amountColor,
-                      fontWeight: FontWeight.bold),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      "${isCredit ? '+' : '-'}₹${GlobalFormatter.formatNumber(ref, transaction.amount)}",
+                      style: TextStyle(
+                          fontSize: 16.0,
+                          color: amountColor,
+                          fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () => _showDeleteTransactionConfirmation(
+                          context, transaction),
+                    ),
+                  ],
                 ),
                 onTap: () {
                   Navigator.push(
@@ -395,7 +407,8 @@ class _EmiDetailsPageState extends ConsumerState<EmiDetailsPage> {
             ? remainingPrincipal // last payment, clear all
             : monthlyPrincipal;
         remainingPrincipal -= principalPaid;
-        DateTime currentMonth = DateTime(paymentDate.year, paymentDate.month + month);
+        DateTime currentMonth =
+            DateTime(paymentDate.year, paymentDate.month + month);
         schedule.add(AmortizationEntry(
           paymentDate: currentMonth,
           principal: principalPaid,
@@ -486,6 +499,34 @@ class _EmiDetailsPageState extends ConsumerState<EmiDetailsPage> {
     }
 
     return '$years ${l10n.years} $months ${l10n.months}';
+  }
+
+  void _showDeleteTransactionConfirmation(
+      BuildContext context, Transaction transaction) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(AppLocalizations.of(context)!.confirmDelete),
+        content: Text('Are you sure you want to delete this transaction?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(AppLocalizations.of(context)!.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(AppLocalizations.of(context)!.delete),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldDelete == true) {
+      ref.read(transactionsNotifierProvider.notifier).remove(transaction);
+      setState(() {
+        // Refresh the UI after deletion
+      });
+    }
   }
 }
 
